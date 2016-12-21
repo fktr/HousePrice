@@ -29,9 +29,9 @@ def gaussian(dist,sigma=10.0):
 
 def wknn(data,v1,k_num=10,k_str=10,wfun=gaussian,w_num=1,w_str=1):
     dlist_num,dlist_str=get_similarity_list(data,v1)
-    weight_num=0
+    weight_num=1
     price_num=0
-    weight_str=0
+    weight_str=1
     price_str=0
     for i in range(k_num):
         w=wfun(i)
@@ -109,7 +109,7 @@ with open('train.csv') as f:
         row=line.strip('\n').split(',')
         houses.append({'input':[row[i] for i in range(1,len(row)-1)],'result':int(row[len(row)-1])})
 
-domain=[(0,10)]*4
+domain=[(1,10)]*4
 best,bestv=geneticoptmize(domain,docost,houses)
 print(best,bestv)
 
