@@ -55,7 +55,7 @@ def divideset(data,rate=0.2):
             trainset.append(row)
     return trainset,testset
 
-def docost(data,v,max_times=100):
+def docost(data,v,max_times=2):
     if v is None:
         return 999999999
     error = 0
@@ -66,41 +66,63 @@ def docost(data,v,max_times=100):
             error += (item['result'] - guess) ** 2
     return error / (max_times * len(testset))
 
-def geneticoptmize(domain,costf,data,size=50,goodrate=0.2,mutprob=0.2,step=1,max_times=100):
+def geneticoptimize(domain,costf,data,popsize=100,step=1,mutprob=0.2,elite=0.2,maxiter=2):
 
-    def mutate(v):
+    def mutate(vec):
         i=random.randint(0,len(domain)-1)
-        if random.random()<0.5 and v[i]>domain[i][0]:
-            return v[0:i]+[v[i]-step]+v[i+1:]
-        elif v[i]<domain[i][1]:
-            return v[0:i]+[v[i]+step]+v[i+1:]
+        if random.random()<0.5 and vec[i]>domain[i][0]:
+            return vec[0:i]+[vec[i]-step]+vec[i+1:]
+        elif vec[i]<domain[i][1]:
+            return vec[0:i]+[vec[i]+step]+vec[i+1:]
 
-    def crossover(v1,v2):
-        i=random.randint(1,len(domain)-1)
-        return v1[0:i]+v2[i:]
+    def crossover(r1,r2):
+        i=random.randint(1,len(domain)-2)
+        return r1[0:i]+r2[i:]
 
-    group=[]
-    for i in range(size):
-        v=[random.randint(domain[j][0],domain[j][1]) for j in range(len(domain))]
-        group.append(v)
-    goods=size*goodrate
+    pop=[]
+    for i in range(popsize):
+        vec=[random.randint(domain[i][0],domain[i][1]) for i in range(len(domain))]
+        pop.append(vec)
+
+    toplite=int(elite*popsize)
     scores=None
-    for i in range(max_times):
-        scores=[(costf(data,v),v) for v in group]
+    for i in range(maxiter):
+        scores=[(costf(data,v),v) for v in pop]
         scores.sort()
         ranked=[v for (s,v) in scores]
-        group=ranked[0:goods]
+        pop=ranked[0:toplite]
 
-        while len(group)<size:
+        if i==maxiter-1:
+            break
+
+        while(len(pop)<popsize):
             if random.random()<mutprob:
-                i=random.randint(0,goods-1)
-                group.append(mutate(ranked[i]))
+                c=random.randint(0,toplite)
+                pop.append(mutate(ranked[c]))
             else:
-                i=random.randint(0,goods-1)
-                j=random.randint(0,goods-1)
-                group.append(crossover(ranked[i],ranked[j]))
+                c1=random.randint(0,toplite)
+                c2=random.randint(0,toplite)
+                pop.append(crossover(ranked[c1],ranked[c2]))
     return scores[0][0],scores[0][1]
 
+def annealingoptimize(domain,costf,data,T=10000.0,cool=0.95,step=1):
+    vec=[5,5,5,5]
+    while T>0.1:
+        i=random.randint(0,len(domain)-1)
+        dir=random.randint(-step,step)
+        vecb=vec[:]
+        vecb[i]+=dir
+        if vecb[i]<domain[i][0]:
+            vecb[i]=domain[i][0]
+        elif vecb[i]>domain[i][1]:
+            vecb[i]=domain[i][1]
+
+        ea=costf(data,vec)
+        eb=costf(data,vecb)
+        if (eb<ea or random.random()<pow(math.e,-(eb-ea)/T)):
+            vec=vecb
+        T=T*cool
+    return costf(vec),vec
 
 houses=[]
 with open('train.csv') as f:
@@ -110,8 +132,11 @@ with open('train.csv') as f:
         houses.append({'input':[row[i] for i in range(1,len(row)-1)],'result':int(row[len(row)-1])})
 
 domain=[(1,10)]*4
-best,bestv=geneticoptmize(domain,docost,houses)
-print(best,bestv)
+'''
+best,bestv=geneticoptimize(domain,docost,houses)
+'''
+
+best,bestv=annealingoptimize(domain,docost,houses)
 
 test=[]
 with open('test.csv') as f:
@@ -124,15 +149,3 @@ with open('result.csv','wt') as f:
     print("Id,SalePrice", file=f)
     for item in test:
         print('%s,%f' %(item['id'],wknn(houses,item['input'],k_num=bestv[0],k_str=bestv[1],w_num=bestv[2],w_str=bestv[3])), file=f)
-
-'''
-79个特征大约有35-36个为数字类型,43-44个为字符串类型
-        a=0
-        b=0
-        for i in range(1,len(row)-1):
-           if row[i].isdigit():
-               a+=1
-           else:
-               b+=1
-        print(a,b)
-'''
